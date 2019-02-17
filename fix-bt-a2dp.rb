@@ -3,6 +3,14 @@
 RUNNING_FILE = '/tmp/.fix-bt-a2dp.running'
 USER_FILE = '/etc/.fix-bt-a2dp.user'
 ROOT_UID = 0
+A2DP_PROFILES = [
+    'a2dp_sink_ldac',
+    'a2dp_sink_aptx_hd',
+    'a2dp_sink_aptx',
+    'a2dp_sink_aac',
+    'a2dp_sink_sbc',
+    'a2dp_sink'
+]
 
 if system("which notify-send &> /dev/null")
   def gui_notify(msg)
@@ -64,14 +72,21 @@ def enable_a2dp(name, mac, bluez_mac, info)
 
   sleep 1
 
-  puts ">> pacmd set-card-profile bluez_card.#{bluez_mac} a2dp_sink"
-  set_card_profile_out = `pacmd set-card-profile bluez_card.#{bluez_mac} a2dp_sink`
-  unless $?.success? && set_card_profile_out == ''
-    command_failed('pacmd set-card-profile', set_card_profile_out)
-  end
+  pactl_cards = `pactl list cards`
+  command_failed('`pactl list cards`', pactl_cards) unless $?.success?
+  a2dp_profile = A2DP_PROFILES.find { |p| pactl_cards.include?(p) }
+  if a2dp_profile.nil?
+    puts "No Bluetooth device matching a supported profile: #{A2DP_PROFILES.map(&:first).join(', ')}"
+  else
+    puts ">> pacmd set-card-profile bluez_card.#{bluez_mac} #{a2dp_profile}"
+    set_card_profile_out = `pacmd set-card-profile bluez_card.#{bluez_mac} #{a2dp_profile}`
+    unless $?.success? && set_card_profile_out == ''
+      command_failed('pacmd set-card-profile', set_card_profile_out)
+    end
 
-  puts "a2dp enabled for #{name}!"
-  gui_notify("#{name} connected and set to A2DP")
+    puts "a2dp enabled for #{name}!"
+    gui_notify("#{name} connected and set to A2DP")
+  end
 end
 
 def scan_enable_a2dp
